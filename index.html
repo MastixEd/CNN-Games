@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNN Games – Image Recognition Adventure</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: linear-gradient(135deg, #1a0533, #2d1b69, #0f3460);
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  #canvas-container {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+  }
+  .ui {
+    position: relative; z-index: 10;
+    max-width: 960px; margin: 0 auto; padding: 20px;
+  }
+  header {
+    text-align: center; padding: 16px 0 8px;
+  }
+  header h1 {
+    font-size: 1.9rem; font-weight: 800;
+    background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  header p { opacity: 0.85; font-size: 0.95rem; margin-top: 4px; }
+  .controls {
+    display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+    margin: 12px 0 20px;
+  }
+  .btn {
+    background: linear-gradient(135deg, #e17055, #d63031);
+    border: none; color: white; padding: 10px 20px;
+    border-radius: 50px; font-weight: 700; font-size: 0.95rem;
+    cursor: pointer; transition: all 0.25s; box-shadow: 0 4px 15px rgba(214,48,49,0.4);
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(214,48,49,0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn.reset { background: linear-gradient(135deg, #6c5ce7, #a29bfe); }
+  .btn.sound { background: linear-gradient(135deg, #00b894, #00cec9); }
+  .btn.sound.off { background: linear-gradient(135deg, #636e72, #2d3436); }
+  .btn.nav { background: linear-gradient(135deg, #0984e3, #74b9ff); }
+  .progress {
+    display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .dot {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: all 0.3s;
+    border: 2px solid transparent;
+  }
+  .dot.active { background: #feca57; color: #1a0533; border-color: #fff; transform: scale(1.15); }
+  .dot.done { background: #e17055; }
+  .card {
+    background: rgba(255,255,255,0.08); backdrop-filter: blur(12px);
+    border-radius: 20px; padding: 24px; margin-bottom: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .card h2 { font-size: 1.45rem; margin-bottom: 8px; color: #feca57; }
+  .card p, .card li { line-height: 1.55; opacity: 0.92; }
+  .level-badge {
+    display: inline-block; background: #e17055; color: white;
+    font-size: 0.75rem; font-weight: 800; padding: 3px 10px;
+    border-radius: 20px; margin-bottom: 8px;
+  }
+  .level-badge.easy { background: #00b894; }
+  .level-badge.medium { background: #fdcb6e; color: #2d3436; }
+  .level-badge.hard { background: #e84393; }
+  .interactive-area {
+    background: rgba(0,0,0,0.25); border-radius: 16px;
+    padding: 18px; margin-top: 14px; min-height: 180px;
+  }
+  .score-box {
+    text-align: center; font-size: 1.4rem; font-weight: 800;
+    margin: 10px 0; color: #feca57;
+  }
+  .timer {
+    text-align: center; font-size: 1.1rem; color: #48dbfb; margin-bottom: 8px;
+  }
+  .object-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px; margin-top: 12px;
+  }
+  .choice-btn {
+    background: rgba(255,255,255,0.12); border: 2px solid transparent;
+    border-radius: 14px; padding: 16px 10px; text-align: center;
+    font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: all 0.25s;
+    color: white;
+  }
+  .choice-btn:hover { transform: translateY(-3px); border-color: #feca57; }
+  .choice-btn.correct { background: rgba(0,184,148,0.4); border-color: #00b894; }
+  .choice-btn.wrong { background: rgba(214,48,49,0.4); border-color: #d63031; }
+  .choice-btn:disabled { pointer-events: none; opacity: 0.85; }
+  .big-emoji {
+    font-size: 4.5rem; text-align: center; margin: 12px 0;
+    filter: blur(0px); transition: filter 0.4s;
+  }
+  .big-emoji.blurred { filter: blur(12px); }
+  .big-emoji.zoomed {
+    font-size: 6rem;
+    clip-path: inset(20% 20% 20% 20%);
+  }
+  .feedback {
+    margin-top: 12px; padding: 12px; border-radius: 12px;
+    background: rgba(254,202,87,0.15); border-left: 4px solid #feca57;
+    display: none;
+  }
+  .feedback.show { display: block; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; justify-content: center; }
+  .hidden { display: none !important; }
+  .lives { font-size: 1.3rem; letter-spacing: 4px; text-align: center; margin: 6px 0; }
+  .progress-bar-bg {
+    height: 12px; background: rgba(255,255,255,0.15); border-radius: 10px; overflow: hidden; margin: 10px 0;
+  }
+  .progress-bar-fill {
+    height: 100%; background: linear-gradient(90deg, #00b894, #feca57); width: 0%; transition: width 0.4s;
+  }
+  footer {
+    text-align: center; padding: 20px; opacity: 0.7; font-size: 0.85rem;
+  }
+  .feature-map {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    max-width: 300px; margin: 16px auto;
+  }
+  .feature-cell {
+    width: 100%;
+    height: 64px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid rgba(255,255,255,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: rgba(255,255,255,0.7);
+    background: rgba(255,255,255,0.12);
+  }
+  .feature-cell:hover { transform: scale(1.08); border-color: #feca57; }
+  .feature-cell.selected {
+    border-color: #fff;
+    box-shadow: 0 0 14px #feca57;
+    background: linear-gradient(135deg, #feca57, #e17055) !important;
+    color: #1a0533;
+  }
+  .feature-cell.target {
+    background: linear-gradient(135deg, #feca57, #e17055);
+    color: #1a0533;
+    border-color: #feca57;
+  }
+  .feature-cell.miss {
+    background: rgba(214,48,49,0.55) !important;
+    border-color: #d63031;
+  }
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div class="ui">
+  <header>
+    <h1>🎮 CNN Image Recognition Games</h1>
+    <p>Play • Learn • Level Up • Ages 9+</p>
+  </header>
+
+  <div class="controls">
+    <button class="btn reset" id="resetBtn">🔄 Reset Current Game</button>
+    <button class="btn sound" id="soundBtn">🔊 Sound: ON</button>
+  </div>
+
+  <div class="progress" id="progressDots"></div>
+
+  <!-- GAME 1: Detective Challenge (Easy) -->
+  <div class="card game" id="game1">
+    <span class="level-badge easy">Game 1 • Easy</span>
+    <h2>🕵️ CNN Detective Challenge</h2>
+    <p>Look at the zoomed-in clue and guess the object! Just like the first layers of a CNN.</p>
+    <div class="interactive-area">
+      <div class="score-box">Score: <span id="g1score">0</span> / 5</div>
+      <div class="timer">Round <span id="g1round">1</span> of 5</div>
+      <div class="big-emoji blurred" id="g1emoji">🐶</div>
+      <div class="object-grid" id="g1choices"></div>
+      <div class="feedback" id="g1feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g1nextBtn">Next Clue →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME 2: Feature Finder (Easy-Medium) -->
+  <div class="card game hidden" id="game2">
+    <span class="level-badge easy">Game 2 • Easy</span>
+    <h2>🔍 Feature Finder Race</h2>
+    <p>Click the glowing cells that look like edges or shapes – the features a CNN would find!</p>
+    <div class="interactive-area">
+      <div class="score-box">Features found: <span id="g2score">0</span> / 6</div>
+      <div class="timer">Time left: <span id="g2time">20</span>s</div>
+      <div class="feature-map" id="featureMap"></div>
+      <div class="feedback" id="g2feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g2startBtn">▶ Start Race</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME 3: Layer Order Dash (Medium) -->
+  <div class="card game hidden" id="game3">
+    <span class="level-badge medium">Game 3 • Medium</span>
+    <h2>🧱 Layer Order Dash</h2>
+    <p>Put the CNN layers in the correct order as fast as you can!</p>
+    <div class="interactive-area">
+      <div class="score-box">Correct sequences: <span id="g3score">0</span></div>
+      <div id="g3slots" class="object-grid" style="grid-template-columns:1fr;"></div>
+      <div id="g3pool" class="object-grid" style="margin-top:16px;"></div>
+      <div class="feedback" id="g3feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g3checkBtn">✅ Check Order</button>
+        <button class="btn" id="g3shuffleBtn">🔀 New Shuffle</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME 4: Accuracy Challenge (Medium-Hard) -->
+  <div class="card game hidden" id="game4">
+    <span class="level-badge medium">Game 4 • Medium</span>
+    <h2>🎯 Accuracy Challenge</h2>
+    <p>Predict what the AI will say, then see if you match! 10 rounds.</p>
+    <div class="interactive-area">
+      <div class="score-box">Your matches: <span id="g4score">0</span> / 10</div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="g4bar"></div></div>
+      <div class="big-emoji" id="g4emoji">🐱</div>
+      <p style="text-align:center;opacity:0.8;" id="g4prompt">What will the AI predict?</p>
+      <div class="object-grid" id="g4choices"></div>
+      <div class="feedback" id="g4feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g4nextBtn">Next Image →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME 5: AI Doctor Boss Fight (Hard) -->
+  <div class="card game hidden" id="game5">
+    <span class="level-badge hard">Game 5 • Boss</span>
+    <h2>🩺 AI Doctor Boss Fight</h2>
+    <p>Your weak AI is confused! Choose the right improvements before lives run out.</p>
+    <div class="interactive-area">
+      <div class="lives" id="g5lives">❤️ ❤️ ❤️</div>
+      <div class="score-box">AI Health: <span id="g5health">40</span>%</div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="g5bar" style="width:40%;background:linear-gradient(90deg,#e17055,#feca57);"></div></div>
+      <p id="g5problem" style="text-align:center;margin:12px 0;font-size:1.1rem;">The AI keeps mistaking cats for dogs…</p>
+      <div class="object-grid" id="g5choices"></div>
+      <div class="feedback" id="g5feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g5restartBtn">🔄 Restart Boss</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME 6: Design Sprint Mini-Game -->
+  <div class="card game hidden" id="game6">
+    <span class="level-badge hard">Game 6 • Creative</span>
+    <h2>🚀 Idea Sprint</h2>
+    <p>Quick! Pick a problem and the best images your AI should learn from.</p>
+    <div class="interactive-area">
+      <div class="score-box">Ideas locked: <span id="g6score">0</span> / 3</div>
+      <div id="g6stage">
+        <p id="g6q" style="text-align:center;font-size:1.15rem;margin-bottom:12px;"></p>
+        <div class="object-grid" id="g6choices"></div>
+      </div>
+      <div class="feedback" id="g6feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g6nextBtn">Next Idea →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME 7: CNN Family Quiz -->
+  <div class="card game hidden" id="game7">
+    <span class="level-badge hard">Game 7 • Advanced</span>
+    <h2>🧬 CNN Family Quiz</h2>
+    <p>Read the clue and pick the correct CNN family. 6 rounds!</p>
+    <div class="interactive-area">
+      <div class="score-box">Score: <span id="g7score">0</span> / 6</div>
+      <div class="timer">Round <span id="g7round">1</span> of 6</div>
+      <p id="g7clue" style="text-align:center;font-size:1.15rem;margin:14px 0;min-height:48px;"></p>
+      <div class="object-grid" id="g7choices"></div>
+      <div class="feedback" id="g7feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g7nextBtn">Next Clue →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME 8: Skip Highway Race -->
+  <div class="card game hidden" id="game8">
+    <span class="level-badge hard">Game 8 • Advanced</span>
+    <h2>🔗 Skip Highway Race</h2>
+    <p>Build the best skip connections before time runs out! Click layers to add green highways.</p>
+    <div class="interactive-area">
+      <div class="score-box">Best score: <span id="g8best">0</span></div>
+      <div class="timer">Time left: <span id="g8time">12</span>s</div>
+      <div id="g8layers" style="text-align:center;padding:16px 0;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;"></div>
+      <p style="text-align:center;opacity:0.8;font-size:0.9rem;">Middle layers (2–4) give the most points!</p>
+      <div class="feedback" id="g8feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g8startBtn">▶ Start Race</button>
+        <button class="btn" id="g8checkBtn">✅ Lock In Skips</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME 9: Mission Match Blitz -->
+  <div class="card game hidden" id="game9">
+    <span class="level-badge hard">Game 9 • Expert</span>
+    <h2>🎯 Mission Match Blitz</h2>
+    <p>Match each mission to the best CNN family as fast as you can!</p>
+    <div class="interactive-area">
+      <div class="score-box">Correct: <span id="g9score">0</span> / 8</div>
+      <div class="timer">Time left: <span id="g9time">45</span>s</div>
+      <p id="g9mission" style="text-align:center;font-size:1.15rem;margin:14px 0;min-height:48px;font-weight:700;"></p>
+      <div class="object-grid" id="g9choices"></div>
+      <div class="feedback" id="g9feedback"></div>
+      <div class="btn-group">
+        <button class="btn" id="g9startBtn">▶ Start Blitz</button>
+        <button class="btn" id="g9restartBtn" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe);">🔄 Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-group" style="margin:20px 0;">
+    <button class="btn nav" id="prevBtn">← Previous</button>
+    <button class="btn nav" id="nextBtn">Next Game →</button>
+  </div>
+
+  <footer>
+    Mastix ED • Teen AI Fundamentals • Lesson 13 • CNNs<br>
+    “Great AI begins with great ideas!” – Professor Spark
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ========== SOUND (only on button click) ==========
+let soundEnabled = true;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playTone(freq, duration = 0.12, type = 'sine', vol = 0.22) {
+  if (!soundEnabled) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+function playSuccess() { playTone(523,0.1); setTimeout(()=>playTone(659,0.1),90); setTimeout(()=>playTone(784,0.16),180); }
+function playClick() { playTone(420, 0.07, 'triangle', 0.14); }
+function playWrong() { playTone(180, 0.22, 'sawtooth', 0.14); }
+function playWhoosh() { playTone(280, 0.2, 'sine', 0.1); }
+function playCoin() { playTone(880, 0.08); setTimeout(()=>playTone(1175,0.1),70); }
+
+// ========== 3D CINEMATIC BACKGROUND ==========
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.z = 28;
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+container.appendChild(renderer.domElement);
+
+const particles = [];
+const colors = [0xff6b6b, 0xfeca57, 0x48dbfb, 0xa29bfe, 0x00b894];
+const pGeo = new THREE.SphereGeometry(0.12, 6, 6);
+for (let i = 0; i < 80; i++) {
+  const mat = new THREE.MeshBasicMaterial({ color: colors[i%colors.length], transparent: true, opacity: 0.55 });
+  const m = new THREE.Mesh(pGeo, mat);
+  m.position.set((Math.random()-0.5)*55, (Math.random()-0.5)*40, (Math.random()-0.5)*35);
+  m.userData = { vy: 0.01 + Math.random()*0.02, rx: Math.random()*0.03 };
+  scene.add(m);
+  particles.push(m);
+}
+// Floating rings (like feature maps)
+const rings = [];
+for (let i = 0; i < 4; i++) {
+  const geo = new THREE.TorusGeometry(2 + i*0.6, 0.08, 8, 40);
+  const mat = new THREE.MeshBasicMaterial({ color: colors[i], transparent: true, opacity: 0.3 });
+  const ring = new THREE.Mesh(geo, mat);
+  ring.position.set(-8 + i*5, Math.sin(i*1.2)*2, -10);
+  scene.add(ring);
+  rings.push(ring);
+}
+function animate() {
+  requestAnimationFrame(animate);
+  particles.forEach(p => {
+    p.position.y += p.userData.vy;
+    p.rotation.x += p.userData.rx;
+    if (p.position.y > 22) p.position.y = -22;
+  });
+  rings.forEach((r,i) => {
+    r.rotation.x += 0.004 + i*0.001;
+    r.rotation.y += 0.006;
+  });
+  renderer.render(scene, camera);
+}
+animate();
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ========== NAVIGATION ==========
+const games = ['game1','game2','game3','game4','game5','game6','game7','game8','game9'];
+let current = 0;
+const progressDots = document.getElementById('progressDots');
+function buildDots() {
+  progressDots.innerHTML = '';
+  games.forEach((_,i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i===current?' active':(i<current?' done':''));
+    d.textContent = i+1;
+    d.onclick = () => { playClick(); goTo(i); };
+    progressDots.appendChild(d);
+  });
+}
+function goTo(idx) {
+  document.getElementById(games[current]).classList.add('hidden');
+  current = idx;
+  document.getElementById(games[current]).classList.remove('hidden');
+  buildDots();
+  playWhoosh();
+  // auto-init some games when entered
+  if (games[current]==='game1') initGame1();
+  if (games[current]==='game3') initGame3();
+  if (games[current]==='game4') initGame4();
+  if (games[current]==='game5') initGame5();
+  if (games[current]==='game6') initGame6();
+  if (games[current]==='game7') initGame7();
+  if (games[current]==='game8') initGame8();
+  if (games[current]==='game9') initGame9();
+}
+document.getElementById('nextBtn').onclick = () => { playClick(); if(current<games.length-1) goTo(current+1); };
+document.getElementById('prevBtn').onclick = () => { playClick(); if(current>0) goTo(current-1); };
+buildDots();
+
+// Sound toggle
+document.getElementById('soundBtn').onclick = function() {
+  soundEnabled = !soundEnabled;
+  this.textContent = soundEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+  this.classList.toggle('off', !soundEnabled);
+  playClick();
+};
+
+// Reset
+document.getElementById('resetBtn').onclick = () => {
+  playClick();
+  resetCurrentGame();
+};
+
+function resetCurrentGame() {
+  const id = games[current];
+  if (id==='game1') { g1score=0; g1round=0; document.getElementById('g1score').textContent='0'; initGame1(); }
+  if (id==='game2') { g2score=0; g2active=false; clearInterval(g2timer); document.getElementById('g2score').textContent='0'; document.getElementById('g2time').textContent='20'; document.getElementById('g2feedback').classList.remove('show'); buildFeatureMap(false); }
+  if (id==='game3') { g3score=0; document.getElementById('g3score').textContent='0'; initGame3(); }
+  if (id==='game4') { g4score=0; g4round=0; document.getElementById('g4score').textContent='0'; document.getElementById('g4bar').style.width='0%'; initGame4(); }
+  if (id==='game5') { initGame5(); }
+  if (id==='game6') { g6score=0; document.getElementById('g6score').textContent='0'; initGame6(); }
+  if (id==='game7') { initGame7(); }
+  if (id==='game8') { clearInterval(g8timer); initGame8(); }
+  if (id==='game9') { clearInterval(g9timer); initGame9(); }
+}
+
+// ========== GAME 1: Detective ==========
+const detectiveData = [
+  { emoji: '🐶', clue: '🐶', options: ['Dog','Cat','Car','Tree'], answer: 'Dog', hint: 'Fur + floppy ears' },
+  { emoji: '🚗', clue: '🚗', options: ['Flower','Car','Apple','Bird'], answer: 'Car', hint: 'Wheels + windows' },
+  { emoji: '🌻', clue: '🌻', options: ['Tree','Flower','Sun','Bee'], answer: 'Flower', hint: 'Petals + center' },
+  { emoji: '🐱', clue: '🐱', options: ['Dog','Cat','Fox','Owl'], answer: 'Cat', hint: 'Whiskers + pointed ears' },
+  { emoji: '🍎', clue: '🍎', options: ['Ball','Apple','Tomato','Cherry'], answer: 'Apple', hint: 'Round + stem' }
+];
+let g1score = 0, g1round = 0, g1answered = false;
+function initGame1() {
+  g1round = 0; g1score = 0; g1answered = false;
+  document.getElementById('g1score').textContent = '0';
+  nextDetective();
+}
+function nextDetective() {
+  if (g1round >= 5) {
+    document.getElementById('g1emoji').textContent = '🏆';
+    document.getElementById('g1emoji').classList.remove('blurred');
+    document.getElementById('g1choices').innerHTML = '';
+    document.getElementById('g1feedback').innerHTML = `You scored ${g1score}/5! Great detective work – that is how early CNN layers find clues.`;
+    document.getElementById('g1feedback').classList.add('show');
+    return;
+  }
+  const d = detectiveData[g1round];
+  document.getElementById('g1round').textContent = g1round + 1;
+  const em = document.getElementById('g1emoji');
+  em.textContent = d.emoji;
+  em.classList.add('blurred');
+  setTimeout(() => em.classList.remove('blurred'), 600);
+  const box = document.getElementById('g1choices');
+  box.innerHTML = '';
+  g1answered = false;
+  d.options.forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = opt;
+    b.onclick = () => {
+      if (g1answered) return;
+      g1answered = true;
+      playClick();
+      if (opt === d.answer) {
+        b.classList.add('correct');
+        g1score++;
+        playSuccess();
+        document.getElementById('g1feedback').innerHTML = `✅ Correct! Hint was: ${d.hint}`;
+      } else {
+        b.classList.add('wrong');
+        playWrong();
+        document.getElementById('g1feedback').innerHTML = `❌ It was ${d.answer}. Hint: ${d.hint}`;
+      }
+      document.getElementById('g1score').textContent = g1score;
+      document.getElementById('g1feedback').classList.add('show');
+    };
+    box.appendChild(b);
+  });
+  document.getElementById('g1feedback').classList.remove('show');
+}
+document.getElementById('g1nextBtn').onclick = () => {
+  playClick();
+  if (!g1answered && g1round < 5) return;
+  g1round++;
+  nextDetective();
+};
+initGame1();
+
+// ========== GAME 2: Feature Finder ==========
+let g2score = 0, g2timer = null, g2timeLeft = 20, g2active = false;
+const featureTargets = [1, 3, 5, 8, 10, 12]; // indices that are “features”
+const featureIcons = ['⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜','⬜'];
+
+function buildFeatureMap(interactive) {
+  const map = document.getElementById('featureMap');
+  map.innerHTML = '';
+  for (let i = 0; i < 16; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'feature-cell';
+    const isTarget = featureTargets.includes(i);
+    if (isTarget) {
+      cell.classList.add('target');
+      cell.textContent = '✨';
+    } else {
+      cell.textContent = '·';
+    }
+    cell.dataset.target = isTarget ? '1' : '0';
+    cell.dataset.index = i;
+    if (interactive) {
+      cell.onclick = () => {
+        if (!g2active || cell.dataset.done) return;
+        playClick();
+        cell.dataset.done = '1';
+        if (cell.dataset.target === '1') {
+          cell.classList.add('selected');
+          cell.textContent = '✓';
+          g2score++;
+          document.getElementById('g2score').textContent = g2score;
+          playCoin();
+          if (g2score >= 6) {
+            g2active = false;
+            clearInterval(g2timer);
+            playSuccess();
+            document.getElementById('g2feedback').innerHTML = '🏆 You found all the features! Just like a convolution layer.';
+            document.getElementById('g2feedback').classList.add('show');
+          }
+        } else {
+          cell.classList.add('miss');
+          cell.textContent = '✗';
+          playWrong();
+        }
+      };
+    }
+    map.appendChild(cell);
+  }
+}
+
+// Show the grid immediately so boxes are visible
+buildFeatureMap(false);
+
+document.getElementById('g2startBtn').onclick = () => {
+  playClick();
+  g2score = 0;
+  g2timeLeft = 20;
+  g2active = true;
+  document.getElementById('g2score').textContent = '0';
+  document.getElementById('g2time').textContent = '20';
+  document.getElementById('g2feedback').classList.remove('show');
+  buildFeatureMap(true); // rebuild with click handlers
+  clearInterval(g2timer);
+  g2timer = setInterval(() => {
+    g2timeLeft--;
+    document.getElementById('g2time').textContent = g2timeLeft;
+    if (g2timeLeft <= 0) {
+      g2active = false;
+      clearInterval(g2timer);
+      document.getElementById('g2feedback').innerHTML = `Time’s up! You found ${g2score}/6 features.`;
+      document.getElementById('g2feedback').classList.add('show');
+    }
+  }, 1000);
+};
+
+// ========== GAME 3: Layer Order ==========
+const layerNames = [
+  { id: 1, text: '📸 Image Input' },
+  { id: 2, text: '🔍 Convolution' },
+  { id: 3, text: '🧊 Pooling' },
+  { id: 4, text: '📄 Flatten' },
+  { id: 5, text: '🏷 Prediction' }
+];
+let g3score = 0, g3placed = [];
+function initGame3() {
+  g3placed = [];
+  const slots = document.getElementById('g3slots');
+  const pool = document.getElementById('g3pool');
+  slots.innerHTML = '';
+  pool.innerHTML = '';
+  // create 5 empty slots
+  for (let i = 0; i < 5; i++) {
+    const s = document.createElement('div');
+    s.className = 'choice-btn';
+    s.style.minHeight = '48px';
+    s.dataset.slot = i;
+    s.textContent = `Slot ${i+1}`;
+    s.onclick = () => {}; // will be filled
+    slots.appendChild(s);
+  }
+  // shuffled pool
+  const shuffled = [...layerNames].sort(() => Math.random() - 0.5);
+  shuffled.forEach(l => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = l.text;
+    b.dataset.id = l.id;
+    b.onclick = () => {
+      playClick();
+      if (g3placed.length >= 5) return;
+      g3placed.push(parseInt(b.dataset.id));
+      const slot = slots.children[g3placed.length - 1];
+      slot.textContent = l.text;
+      slot.style.background = 'rgba(0,184,148,0.25)';
+      b.disabled = true;
+      b.style.opacity = '0.4';
+    };
+    pool.appendChild(b);
+  });
+  document.getElementById('g3feedback').classList.remove('show');
+}
+document.getElementById('g3checkBtn').onclick = () => {
+  playClick();
+  const correct = [1,2,3,4,5];
+  const ok = g3placed.length === 5 && g3placed.every((v,i) => v === correct[i]);
+  const fb = document.getElementById('g3feedback');
+  if (ok) {
+    g3score++;
+    document.getElementById('g3score').textContent = g3score;
+    playSuccess();
+    fb.innerHTML = '🏆 Perfect order! Image → Conv → Pool → Flatten → Predict';
+  } else {
+    playWrong();
+    fb.innerHTML = 'Not yet. Remember the journey: Image first, then find features, keep important ones, flatten, then predict.';
+  }
+  fb.classList.add('show');
+};
+document.getElementById('g3shuffleBtn').onclick = () => { playClick(); initGame3(); };
+
+// ========== GAME 4: Accuracy Challenge ==========
+const images = [
+  { emoji: '🐱', ai: 'Cat', options: ['Cat','Dog','Car','Flower'] },
+  { emoji: '🐶', ai: 'Dog', options: ['Cat','Dog','Bird','Apple'] },
+  { emoji: '🚗', ai: 'Car', options: ['Truck','Car','Bike','Bus'] },
+  { emoji: '🌻', ai: 'Flower', options: ['Tree','Flower','Grass','Sun'] },
+  { emoji: '🍎', ai: 'Apple', options: ['Orange','Apple','Ball','Tomato'] },
+  { emoji: '🐦', ai: 'Bird', options: ['Plane','Bird','Bat','Kite'] },
+  { emoji: '🌳', ai: 'Tree', options: ['Bush','Tree','Flower','House'] },
+  { emoji: '🐸', ai: 'Frog', options: ['Lizard','Frog','Turtle','Fish'] },
+  { emoji: '🐴', ai: 'Horse', options: ['Cow','Horse','Deer','Zebra'] },
+  { emoji: '✈️', ai: 'Airplane', options: ['Bird','Airplane','Rocket','Kite'] }
+];
+let g4score = 0, g4round = 0, g4answered = false;
+function initGame4() {
+  g4round = 0; g4score = 0; g4answered = false;
+  document.getElementById('g4score').textContent = '0';
+  document.getElementById('g4bar').style.width = '0%';
+  nextAccuracy();
+}
+function nextAccuracy() {
+  if (g4round >= 10) {
+    document.getElementById('g4emoji').textContent = '🏅';
+    document.getElementById('g4choices').innerHTML = '';
+    document.getElementById('g4prompt').textContent = `Finished! You matched the AI ${g4score}/10 times.`;
+    document.getElementById('g4feedback').innerHTML = 'Accuracy is how often the AI (and you!) get it right on new pictures.';
+    document.getElementById('g4feedback').classList.add('show');
+    return;
+  }
+  const img = images[g4round];
+  document.getElementById('g4emoji').textContent = img.emoji;
+  document.getElementById('g4prompt').textContent = 'What will the AI predict?';
+  const box = document.getElementById('g4choices');
+  box.innerHTML = '';
+  g4answered = false;
+  img.options.forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = opt;
+    b.onclick = () => {
+      if (g4answered) return;
+      g4answered = true;
+      playClick();
+      if (opt === img.ai) {
+        b.classList.add('correct');
+        g4score++;
+        playSuccess();
+        document.getElementById('g4feedback').innerHTML = `✅ AI also said “${img.ai}”! Match!`;
+      } else {
+        b.classList.add('wrong');
+        playWrong();
+        document.getElementById('g4feedback').innerHTML = `AI predicted “${img.ai}”. You said “${opt}”.`;
+      }
+      document.getElementById('g4score').textContent = g4score;
+      document.getElementById('g4bar').style.width = ((g4round+1)/10*100) + '%';
+      document.getElementById('g4feedback').classList.add('show');
+    };
+    box.appendChild(b);
+  });
+  document.getElementById('g4feedback').classList.remove('show');
+}
+document.getElementById('g4nextBtn').onclick = () => {
+  playClick();
+  if (!g4answered && g4round < 10) return;
+  g4round++;
+  nextAccuracy();
+};
+
+// ========== GAME 5: AI Doctor Boss ==========
+const problems = [
+  { text: 'AI confuses cats and dogs…', good: ['More varied pet photos', 'Balance cat & dog counts'], bad: ['Only train on cars', 'Use blurry photos'] },
+  { text: 'AI fails on dark photos…', good: ['Add photos with different lighting', 'Include night-time images'], bad: ['Delete all dark photos', 'Train only 1 epoch'] },
+  { text: 'AI is only 55% accurate…', good: ['Train longer', 'Add more training images'], bad: ['Use fewer images', 'Remove the pooling layer'] },
+  { text: 'AI never saw side views…', good: ['Add different angles', 'Include rotated photos'], bad: ['Only use front views', 'Make images smaller'] }
+];
+let g5lives = 3, g5health = 40, g5idx = 0;
+function initGame5() {
+  g5lives = 3; g5health = 40; g5idx = 0;
+  updateLives();
+  document.getElementById('g5health').textContent = g5health;
+  document.getElementById('g5bar').style.width = g5health + '%';
+  document.getElementById('g5feedback').classList.remove('show');
+  showProblem();
+}
+function updateLives() {
+  document.getElementById('g5lives').textContent = '❤️ '.repeat(g5lives) + '🖤 '.repeat(3-g5lives);
+}
+function showProblem() {
+  if (g5health >= 95) {
+    playSuccess();
+    document.getElementById('g5problem').textContent = '🎉 AI fully recovered! You are an AI Doctor!';
+    document.getElementById('g5choices').innerHTML = '';
+    return;
+  }
+  if (g5lives <= 0) {
+    playWrong();
+    document.getElementById('g5problem').textContent = 'Out of lives… Restart and try better improvements!';
+    document.getElementById('g5choices').innerHTML = '';
+    return;
+  }
+  const p = problems[g5idx % problems.length];
+  document.getElementById('g5problem').textContent = p.text;
+  const all = [...p.good, ...p.bad].sort(() => Math.random()-0.5);
+  const box = document.getElementById('g5choices');
+  box.innerHTML = '';
+  all.forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = opt;
+    b.onclick = () => {
+      playClick();
+      const isGood = p.good.includes(opt);
+      if (isGood) {
+        b.classList.add('correct');
+        g5health = Math.min(100, g5health + 18);
+        playSuccess();
+        document.getElementById('g5feedback').innerHTML = '✅ Great improvement! AI is getting stronger.';
+      } else {
+        b.classList.add('wrong');
+        g5lives--;
+        g5health = Math.max(10, g5health - 8);
+        playWrong();
+        updateLives();
+        document.getElementById('g5feedback').innerHTML = '❌ That made things worse…';
+      }
+      document.getElementById('g5health').textContent = g5health;
+      document.getElementById('g5bar').style.width = g5health + '%';
+      document.getElementById('g5feedback').classList.add('show');
+      setTimeout(() => {
+        g5idx++;
+        showProblem();
+      }, 900);
+    };
+    box.appendChild(b);
+  });
+}
+document.getElementById('g5restartBtn').onclick = () => { playClick(); initGame5(); };
+
+// ========== GAME 6: Idea Sprint ==========
+const ideaStages = [
+  {
+    q: 'Pick a real-world problem for your AI:',
+    options: ['Find lost pets', 'Sort recycling', 'Spot unhealthy plants', 'Read handwritten homework'],
+    correct: null // any is fine
+  },
+  {
+    q: 'Which images should it learn from?',
+    options: ['Only perfect photos', 'Many angles & lighting', 'Just 5 pictures', 'Random screenshots'],
+    good: 'Many angles & lighting'
+  },
+  {
+    q: 'Best way to improve accuracy?',
+    options: ['More balanced data', 'Never test it', 'Use only one category', 'Ignore mistakes'],
+    good: 'More balanced data'
+  }
+];
+let g6score = 0, g6stage = 0;
+function initGame6() {
+  g6score = 0; g6stage = 0;
+  document.getElementById('g6score').textContent = '0';
+  showIdeaStage();
+}
+function showIdeaStage() {
+  if (g6stage >= 3) {
+    document.getElementById('g6q').textContent = '🏆 Sprint complete! You designed a solid AI idea.';
+    document.getElementById('g6choices').innerHTML = '';
+    document.getElementById('g6feedback').innerHTML = 'Remember: great AI starts with clear problems + good, varied data.';
+    document.getElementById('g6feedback').classList.add('show');
+    return;
+  }
+  const s = ideaStages[g6stage];
+  document.getElementById('g6q').textContent = s.q;
+  const box = document.getElementById('g6choices');
+  box.innerHTML = '';
+  document.getElementById('g6feedback').classList.remove('show');
+  s.options.forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = opt;
+    b.onclick = () => {
+      playClick();
+      let good = true;
+      if (s.good && opt !== s.good) good = false;
+      if (good) {
+        b.classList.add('correct');
+        g6score++;
+        playSuccess();
+        document.getElementById('g6feedback').innerHTML = '✅ Smart choice!';
+      } else {
+        b.classList.add('wrong');
+        playWrong();
+        document.getElementById('g6feedback').innerHTML = `Better: “${s.good}”`;
+      }
+      document.getElementById('g6score').textContent = g6score;
+      document.getElementById('g6feedback').classList.add('show');
+    };
+    box.appendChild(b);
+  });
+}
+document.getElementById('g6nextBtn').onclick = () => {
+  playClick();
+  g6stage++;
+  showIdeaStage();
+};
+
+// ========== GAME 7: CNN Family Quiz ==========
+const familyClues = [
+  { clue: 'A simple stack: Convolution → Pooling → Flatten → Dense. Great for beginners.', answer: 'Classic CNN', options: ['Classic CNN','Deep CNN','ResNet','MobileNet'] },
+  { clue: 'Many layers stacked (16–19). Needs lots of data and power, but finds very detailed patterns.', answer: 'Deep CNN', options: ['Classic CNN','Deep CNN','ResNet','MobileNet'] },
+  { clue: 'Uses skip connections so information can jump over layers. Can be 50–150+ layers deep.', answer: 'ResNet', options: ['Classic CNN','Deep CNN','ResNet','MobileNet'] },
+  { clue: 'Tiny and fast – designed to run on phones with TensorFlow Lite.', answer: 'MobileNet', options: ['Classic CNN','Deep CNN','ResNet','MobileNet'] },
+  { clue: 'Best choice when you need maximum accuracy in a hard image contest.', answer: 'ResNet', options: ['Classic CNN','Deep CNN','ResNet','MobileNet'] },
+  { clue: 'Best choice for a plant-ID app that must work offline on a phone.', answer: 'MobileNet', options: ['Classic CNN','Deep CNN','ResNet','MobileNet'] }
+];
+let g7score = 0, g7round = 0, g7answered = false;
+
+function initGame7() {
+  g7score = 0; g7round = 0; g7answered = false;
+  document.getElementById('g7score').textContent = '0';
+  nextFamilyClue();
+}
+function nextFamilyClue() {
+  if (g7round >= 6) {
+    document.getElementById('g7clue').textContent = '🏆 Quiz complete!';
+    document.getElementById('g7choices').innerHTML = '';
+    document.getElementById('g7feedback').innerHTML = `You scored ${g7score}/6. You now know the four CNN families!`;
+    document.getElementById('g7feedback').classList.add('show');
+    return;
+  }
+  const d = familyClues[g7round];
+  document.getElementById('g7round').textContent = g7round + 1;
+  document.getElementById('g7clue').textContent = d.clue;
+  const box = document.getElementById('g7choices');
+  box.innerHTML = '';
+  g7answered = false;
+  d.options.forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = opt;
+    b.onclick = () => {
+      if (g7answered) return;
+      g7answered = true;
+      playClick();
+      if (opt === d.answer) {
+        b.classList.add('correct');
+        g7score++;
+        playSuccess();
+        document.getElementById('g7feedback').innerHTML = `✅ Correct! It is ${d.answer}.`;
+      } else {
+        b.classList.add('wrong');
+        playWrong();
+        document.getElementById('g7feedback').innerHTML = `❌ It was ${d.answer}.`;
+      }
+      document.getElementById('g7score').textContent = g7score;
+      document.getElementById('g7feedback').classList.add('show');
+    };
+    box.appendChild(b);
+  });
+  document.getElementById('g7feedback').classList.remove('show');
+}
+document.getElementById('g7nextBtn').onclick = () => {
+  playClick();
+  if (!g7answered && g7round < 6) return;
+  g7round++;
+  nextFamilyClue();
+};
+
+// ========== GAME 8: Skip Highway Race ==========
+let g8timer = null, g8timeLeft = 12, g8active = false, g8best = 0;
+function initGame8() {
+  g8active = false;
+  clearInterval(g8timer);
+  document.getElementById('g8time').textContent = '12';
+  document.getElementById('g8feedback').classList.remove('show');
+  const box = document.getElementById('g8layers');
+  box.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    const s = document.createElement('span');
+    s.className = 'choice-btn';
+    s.style.minWidth = '70px';
+    s.textContent = 'Layer ' + i;
+    s.dataset.id = i;
+    s.dataset.skip = '0';
+    s.onclick = () => {
+      if (!g8active) return;
+      playClick();
+      if (s.dataset.skip === '0') {
+        s.dataset.skip = '1';
+        s.style.background = 'rgba(0,184,148,0.45)';
+        s.style.borderColor = '#00b894';
+      } else {
+        s.dataset.skip = '0';
+        s.style.background = '';
+        s.style.borderColor = '';
+      }
+    };
+    box.appendChild(s);
+  }
+}
+document.getElementById('g8startBtn').onclick = () => {
+  playClick();
+  initGame8();
+  g8active = true;
+  g8timeLeft = 12;
+  document.getElementById('g8time').textContent = '12';
+  document.getElementById('g8feedback').classList.remove('show');
+  clearInterval(g8timer);
+  g8timer = setInterval(() => {
+    g8timeLeft--;
+    document.getElementById('g8time').textContent = g8timeLeft;
+    if (g8timeLeft <= 0) {
+      clearInterval(g8timer);
+      g8active = false;
+      lockSkips();
+    }
+  }, 1000);
+};
+function lockSkips() {
+  g8active = false;
+  clearInterval(g8timer);
+  const skipped = [...document.querySelectorAll('#g8layers [data-skip="1"]')].map(el => el.dataset.id);
+  const names = skipped.map(id => 'Layer ' + id).join(', ') || 'none';
+  let points = 0;
+  skipped.forEach(id => {
+    if (['2','3','4'].includes(id)) points += 3;
+    else points += 1;
+  });
+  if (skipped.length === 5) points = 0; // all skipped = bad
+  if (points > g8best) g8best = points;
+  document.getElementById('g8best').textContent = g8best;
+  const fb = document.getElementById('g8feedback');
+  if (points >= 6) {
+    playSuccess();
+    fb.innerHTML = `🏆 Awesome! You skipped ${names}. Score this round: ${points} points.`;
+  } else if (points > 0) {
+    playSuccess();
+    fb.innerHTML = `✅ You skipped ${names}. Score this round: ${points} points. Middle layers give more points!`;
+  } else {
+    playWrong();
+    fb.innerHTML = `You skipped ${names}. Try focusing on middle layers (2, 3, 4) for higher scores.`;
+  }
+  fb.classList.add('show');
+}
+document.getElementById('g8checkBtn').onclick = () => {
+  playClick();
+  if (!g8active && g8timeLeft === 12) return; // not started
+  lockSkips();
+};
+
+// ========== GAME 9: Mission Match Blitz ==========
+const allMissions = [
+  { text: '“Is this a cat or a dog?” (simple classification)', answer: 'Classic CNN' },
+  { text: 'Winning a hard image recognition contest', answer: 'ResNet' },
+  { text: 'Plant ID app that must run on a phone offline', answer: 'MobileNet' },
+  { text: 'Need very detailed features from many stacked filters', answer: 'Deep CNN' },
+  { text: 'Face unlock on a smartphone', answer: 'MobileNet' },
+  { text: 'Medical image analysis that needs max accuracy', answer: 'ResNet' },
+  { text: 'First CNN project for a beginner class', answer: 'Classic CNN' },
+  { text: 'Research model with 100+ layers', answer: 'ResNet' },
+  { text: 'Sorting recycling photos on a school tablet', answer: 'MobileNet' },
+  { text: 'Detecting tiny defects in factory photos', answer: 'Deep CNN' },
+  { text: 'Homework helper that reads handwritten numbers', answer: 'Classic CNN' },
+  { text: 'Self-driving car traffic-sign recognition (max accuracy)', answer: 'ResNet' }
+];
+const familyOpts = ['Classic CNN','Deep CNN','ResNet','MobileNet'];
+let g9score = 0, g9idx = 0, g9timer = null, g9timeLeft = 45;
+let g9active = false, g9paused = false, g9answered = false;
+let g9missions = [];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function setStartBtnLabel() {
+  const btn = document.getElementById('g9startBtn');
+  if (!g9active) {
+    btn.textContent = '▶ Start Blitz';
+  } else if (g9paused) {
+    btn.textContent = '▶ Resume';
+  } else {
+    btn.textContent = '⏸ Pause';
+  }
+}
+
+function initGame9() {
+  g9score = 0; g9idx = 0; g9active = false; g9paused = false; g9answered = false;
+  clearInterval(g9timer);
+  g9missions = shuffleArray(allMissions).slice(0, 8); // 8 random questions each run
+  document.getElementById('g9score').textContent = '0';
+  document.getElementById('g9time').textContent = '45';
+  document.getElementById('g9mission').textContent = 'Press Start Blitz to begin!';
+  document.getElementById('g9choices').innerHTML = '';
+  document.getElementById('g9feedback').classList.remove('show');
+  setStartBtnLabel();
+}
+
+function showMission() {
+  if (g9idx >= g9missions.length || g9timeLeft <= 0) {
+    endBlitz();
+    return;
+  }
+  const m = g9missions[g9idx];
+  document.getElementById('g9mission').textContent = m.text;
+  const box = document.getElementById('g9choices');
+  box.innerHTML = '';
+  g9answered = false;
+  // shuffle answer order too
+  shuffleArray(familyOpts).forEach(opt => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = opt;
+    b.onclick = () => {
+      if (!g9active || g9paused || g9answered) return;
+      g9answered = true;
+      playClick();
+      if (opt === m.answer) {
+        b.classList.add('correct');
+        g9score++;
+        playSuccess();
+        document.getElementById('g9feedback').innerHTML = `✅ ${m.answer}!`;
+      } else {
+        b.classList.add('wrong');
+        playWrong();
+        document.getElementById('g9feedback').innerHTML = `❌ Best answer: ${m.answer}`;
+      }
+      document.getElementById('g9score').textContent = g9score;
+      document.getElementById('g9feedback').classList.add('show');
+      setTimeout(() => {
+        g9idx++;
+        document.getElementById('g9feedback').classList.remove('show');
+        showMission();
+      }, 700);
+    };
+    box.appendChild(b);
+  });
+}
+
+function endBlitz() {
+  g9active = false;
+  g9paused = false;
+  clearInterval(g9timer);
+  document.getElementById('g9mission').textContent = g9timeLeft <= 0 ? '⏰ Time’s up!' : '🏁 Blitz finished!';
+  document.getElementById('g9choices').innerHTML = '';
+  document.getElementById('g9feedback').innerHTML = `You got ${g9score}/${g9missions.length} correct. Great matching skills!`;
+  document.getElementById('g9feedback').classList.add('show');
+  setStartBtnLabel();
+}
+
+function startTimer() {
+  clearInterval(g9timer);
+  g9timer = setInterval(() => {
+    if (g9paused) return;
+    g9timeLeft--;
+    document.getElementById('g9time').textContent = g9timeLeft;
+    if (g9timeLeft <= 0) endBlitz();
+  }, 1000);
+}
+
+document.getElementById('g9startBtn').onclick = () => {
+  playClick();
+  // Not started yet → start
+  if (!g9active && !g9paused) {
+    g9missions = shuffleArray(allMissions).slice(0, 8);
+    g9score = 0; g9idx = 0; g9answered = false;
+    g9timeLeft = 45;
+    g9active = true; g9paused = false;
+    document.getElementById('g9score').textContent = '0';
+    document.getElementById('g9time').textContent = '45';
+    document.getElementById('g9feedback').classList.remove('show');
+    setStartBtnLabel();
+    showMission();
+    startTimer();
+    return;
+  }
+  // Running → pause
+  if (g9active && !g9paused) {
+    g9paused = true;
+    setStartBtnLabel();
+    return;
+  }
+  // Paused → resume
+  if (g9active && g9paused) {
+    g9paused = false;
+    setStartBtnLabel();
+    return;
+  }
+};
+
+document.getElementById('g9restartBtn').onclick = () => {
+  playClick();
+  clearInterval(g9timer);
+  initGame9();
+};
+</script>
+</body>
+</html>
